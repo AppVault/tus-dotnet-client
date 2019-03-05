@@ -53,9 +53,9 @@ namespace TusClient
             {
                 metadata["filename"] = file.Name;
             }
-            return Create(URL, file.Length, metadata);
+            return Create(URL, file.Length, metadata, null);
         }
-        public string Create(string URL, long UploadLength, Dictionary<string, string> metadata = null)
+        public string Create(string URL, long UploadLength, Dictionary<string, string> metadata = null, Dictionary<string, string> headers = null)
         {
             var requestUri = new Uri(URL);
             var client = new TusHTTPClient();
@@ -67,10 +67,18 @@ namespace TusClient
             request.AddHeader("Upload-Length", UploadLength.ToString());
             request.AddHeader("Content-Length", "0");
 
+            if (headers != null)
+            {
+                foreach (var header in headers)
+                {
+                    request.AddHeader(header.Key, header.Value);
+                }
+            }
+
             if (metadata == null)
             {
                 metadata = new Dictionary<string,string>();
-            }
+            }          
 
             var metadatastrings = new List<string>();
             foreach (var meta in metadata)
@@ -118,17 +126,16 @@ namespace TusClient
         {
             using (var fs = new FileStream(file.FullName, FileMode.Open, FileAccess.Read))
             {
-                Upload(URL, fs);
+                Upload(URL, fs, (int)Math.Ceiling(3 * 1024.0 * 1024.0), null);
             }
 
         }
-        public void Upload(string URL, System.IO.Stream fs)
+        public void Upload(string URL, System.IO.Stream fs, int ChunkSize, Dictionary<string, string> headers = null)
         {
 
-            var Offset = this.getFileOffset(URL);
+            var Offset = this.getFileOffset(URL, headers);
             var client = new TusHTTPClient();
             System.Security.Cryptography.SHA1 sha = new System.Security.Cryptography.SHA1Managed();
-            int ChunkSize = (int) Math.Ceiling(3 * 1024.0 * 1024.0); //3 mb
 
             if (Offset == fs.Length)
             {
@@ -153,6 +160,13 @@ namespace TusClient
                     request.AddHeader("Upload-Offset", string.Format("{0}", Offset));
                     request.AddHeader("Upload-Checksum", "sha1 " + Convert.ToBase64String(sha1hash));
                     request.AddHeader("Content-Type", "application/offset+octet-stream");
+                    if (headers != null)
+                    {
+                        foreach (var header in headers)
+                        {
+                            request.AddHeader(header.Key, header.Value);
+                        }
+                    }
                     request.BodyBytes = buffer;
 
                     request.Uploading += delegate(long bytesTransferred, long bytesTotal)
@@ -201,14 +215,20 @@ namespace TusClient
             
         }
         //------------------------------------------------------------------------------------------------
-        public TusHTTPResponse Download(string URL)
+        public TusHTTPResponse Download(string URL, Dictionary<string, string> headers = null)
         {
             var client = new TusHTTPClient();
 
             var request = new TusHTTPRequest(URL);
             request.cancelToken = this.cancelSource.Token;
             request.Method = "GET";
-
+            if (headers != null)
+            {
+                foreach (var header in headers)
+                {
+                    request.AddHeader(header.Key, header.Value);
+                }
+            }
             request.Downloading += delegate(long bytesTransferred, long bytesTotal)
             {
                 if (Downloading != null)
@@ -220,13 +240,19 @@ namespace TusClient
             return response;
         }
         //------------------------------------------------------------------------------------------------
-        public TusHTTPResponse Head(string URL)
+        public TusHTTPResponse Head(string URL, Dictionary<string, string> headers = null)
         {
             var client = new TusHTTPClient();
             var request = new TusHTTPRequest(URL);
             request.Method = "HEAD";
             request.AddHeader("Tus-Resumable", "1.0.0");
-
+            if (headers != null)
+            {
+                foreach (var header in headers)
+                {
+                    request.AddHeader(header.Key, header.Value);
+                }
+            }
             try
             {
                 var response = client.PerformRequest(request);
@@ -254,12 +280,18 @@ namespace TusClient
             
         }
 
-        public TusServerInfo getServerInfo(string URL)
+        public TusServerInfo getServerInfo(string URL, Dictionary<string, string> headers = null)
         {
             var client = new TusHTTPClient();
             var request = new TusHTTPRequest(URL);
             request.Method = "OPTIONS";
-
+            if (headers != null)
+            {
+                foreach (var header in headers)
+                {
+                    request.AddHeader(header.Key, header.Value);
+                }
+            }
             var response = client.PerformRequest(request);
 
             if (response.StatusCode == HttpStatusCode.NoContent || response.StatusCode == HttpStatusCode.OK)
@@ -288,13 +320,19 @@ namespace TusClient
             }
         }
         //------------------------------------------------------------------------------------------------
-        public bool Delete(string URL)
+        public bool Delete(string URL, Dictionary<string, string> headers = null)
         {
             var client = new TusHTTPClient();
             var request = new TusHTTPRequest(URL);
             request.Method = "DELETE";
             request.AddHeader("Tus-Resumable", "1.0.0");
-
+            if (headers != null)
+            {
+                foreach (var header in headers)
+                {
+                    request.AddHeader(header.Key, header.Value);
+                }
+            }
             var response = client.PerformRequest(request);
 
             if (response.StatusCode == HttpStatusCode.NoContent || response.StatusCode == HttpStatusCode.NotFound || response.StatusCode == HttpStatusCode.Gone)
@@ -309,13 +347,19 @@ namespace TusClient
         // ***********************************************************************************************
         // Internal
         //------------------------------------------------------------------------------------------------
-        private long getFileOffset(string URL)
+        private long getFileOffset(string URL, Dictionary<string, string> headers = null)
         {
             var client = new TusHTTPClient();
             var request = new TusHTTPRequest(URL);
             request.Method = "HEAD";
             request.AddHeader("Tus-Resumable", "1.0.0");
-
+            if (headers != null)
+            {
+                foreach (var header in headers)
+                {
+                    request.AddHeader(header.Key, header.Value);
+                }
+            }
             var response = client.PerformRequest(request);
 
             if (response.StatusCode == HttpStatusCode.NoContent || response.StatusCode == HttpStatusCode.OK)

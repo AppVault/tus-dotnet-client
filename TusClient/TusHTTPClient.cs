@@ -63,7 +63,8 @@ namespace TusClient
 
         public TusHTTPResponse()
         {
-            this.Headers = new Dictionary<string, string>();
+            var comparer = StringComparer.OrdinalIgnoreCase;
+            this.Headers = new Dictionary<string, string>(comparer);
         }
 
     }
